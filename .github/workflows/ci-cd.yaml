@@ -55,7 +55,7 @@ jobs:
       - uses: actions/setup-go@v5
         if: contains(fromJSON('["checkout", "product-catalog"]'), matrix.service)
         with:
-          go-version: '1.22.9'
+          go-version: '1.25.x'
           cache-dependency-path: ${{ matrix.directory }}/go.sum
       - uses: actions/setup-dotnet@v4
         if: matrix.service == 'cart'
@@ -94,8 +94,9 @@ jobs:
           scanners: vuln,secret,misconfig
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          skip-dirs: kubernetes,internal,test,src/react-native-app,src/product-catalog/genproto,src/recommendation/genproto
+          skip-dirs: kubernetes,internal,test,src/react-native-app,src/checkout/genproto,src/currency/genproto,src/product-catalog/genproto,src/recommendation/genproto
           skip-files: src/frontend/Dockerfile.cypress
+          trivyignores: .trivyignore.yaml
           exit-code: '1'
 
   validate-platform:

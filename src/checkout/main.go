@@ -128,6 +128,7 @@ type checkout struct {
 	paymentSvcAddr        string
 	kafkaBrokerSvcAddr    string
 	pb.UnimplementedCheckoutServiceServer
+	healthpb.UnimplementedHealthServer
 	KafkaProducerClient     sarama.AsyncProducer
 	shippingSvcClient       pb.ShippingServiceClient
 	productCatalogSvcClient pb.ProductCatalogServiceClient
@@ -160,7 +161,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	openfeature.SetProvider(flagd.NewProvider())
+	provider, err := flagd.NewProvider()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := openfeature.SetProvider(provider); err != nil {
+		log.Fatal(err)
+	}
 	openfeature.AddHooks(otelhooks.NewTracesHook())
 
 	tracer = tp.Tracer("checkout")
@@ -261,7 +268,7 @@ func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (
 
 	prep, err := cs.prepareOrderItemsAndShippingQuoteFromCart(ctx, req.UserId, req.UserCurrency, req.Address)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 	span.AddEvent("prepared")
 

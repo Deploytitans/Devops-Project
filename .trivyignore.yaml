@@ -1,0 +1,9 @@
+misconfigurations:
+  - id: AVD-AWS-0104
+    paths:
+      - "terraform-aws-modules/eks/aws/node_groups.tf"
+    statement: >-
+      The upstream EKS module's managed-node rule permits required outbound access.
+      Private subnets, NAT controls, and Kubernetes network policies provide the
+      current compensating controls; replace this with endpoint-specific egress.
+    expired_at: 2026-11-16

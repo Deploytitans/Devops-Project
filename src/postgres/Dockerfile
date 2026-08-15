@@ -5,4 +5,5 @@ FROM postgres:17.6
 
 COPY ./src/postgres/init.sql /docker-entrypoint-initdb.d/init.sql
 
+USER postgres
 EXPOSE ${POSTGRES_PORT}
