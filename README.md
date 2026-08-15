@@ -1,5 +1,8 @@
 **Note:** This project is a fork of `opentelemetry-demo`. Thanks to the team and contributors for opensourcing this wonderful demo project. Definitely one of the best on internet.
 
+> Production deployment: see [Containerization, EKS, observability, security,
+> and CI/CD](docs/production-deployment.md).
+
 <!-- markdownlint-disable-next-line -->
 # <img src="https://opentelemetry.io/img/logos/opentelemetry-logo-nav.png" alt="OTel logo" width="45"> OpenTelemetry Demo
 

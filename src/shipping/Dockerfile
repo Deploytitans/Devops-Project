@@ -58,8 +58,10 @@ RUN wget -qO/bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health
 FROM debian:bookworm-slim AS release
 
 WORKDIR /app
-COPY --from=builder /app/target/release/shipping /app/shipping
+RUN groupadd --system --gid 10001 app && useradd --system --uid 10001 --gid app app
+COPY --chown=app:app --from=builder /app/target/release/shipping /app/shipping
 COPY --from=builder /bin/grpc_health_probe /bin/grpc_health_probe
 
+USER 10001:10001
 EXPOSE ${SHIPPING_PORT}
 ENTRYPOINT ["/app/shipping"]

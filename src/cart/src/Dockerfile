@@ -37,5 +37,6 @@ COPY --from=builder /cart/ ./
 
 ENV DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE=false
 
+USER app
 EXPOSE ${CART_PORT}
 ENTRYPOINT [ "./cart" ]

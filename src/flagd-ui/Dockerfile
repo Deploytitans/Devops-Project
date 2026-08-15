@@ -21,13 +21,15 @@ WORKDIR /app
 
 COPY ./src/flagd-ui/package*.json ./
 
-RUN npm ci --only=production
+RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=builder /app/src/instrumentation.ts ./instrumentation.ts
 COPY --from=builder /app/next.config.mjs ./next.config.mjs
 
 COPY --from=builder /app/.next ./.next
 
+RUN chown -R node:node /app
+USER node
 EXPOSE 4000
 
 CMD ["npm", "start"]

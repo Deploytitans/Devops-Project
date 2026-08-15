@@ -4,9 +4,8 @@
 
 FROM php:8.3-cli AS base
 
-ADD https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
-RUN chmod +x /usr/local/bin/install-php-extensions \
-  && install-php-extensions \
+COPY --from=mlocati/php-extension-installer:2.7.31 /usr/bin/install-php-extensions /usr/local/bin/
+RUN install-php-extensions \
     opcache \
     pcntl \
     protobuf \

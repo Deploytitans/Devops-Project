@@ -1,0 +1,123 @@
+# Values for open-telemetry/opentelemetry-demo chart 0.40.9.
+# IMAGE_REPOSITORY and IMAGE_TAG are substituted by CI.
+default:
+  image:
+    repository: IMAGE_REPOSITORY
+    tag: IMAGE_TAG
+    pullPolicy: IfNotPresent
+  replicas: 2
+  revisionHistoryLimit: 3
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+    seccompProfile:
+      type: RuntimeDefault
+  schedulingRules:
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/part-of: opentelemetry-demo
+
+components:
+  # These optional AI services are not present in this source tree.
+  llm:
+    enabled: false
+  product-reviews:
+    enabled: false
+
+  accounting:
+    resources:
+      requests: {cpu: 50m, memory: 96Mi}
+      limits: {memory: 192Mi}
+  ad:
+    resources:
+      requests: {cpu: 100m, memory: 192Mi}
+      limits: {memory: 384Mi}
+  cart:
+    resources:
+      requests: {cpu: 50m, memory: 96Mi}
+      limits: {memory: 192Mi}
+  checkout:
+    resources:
+      requests: {cpu: 50m, memory: 32Mi}
+      limits: {memory: 96Mi}
+  currency:
+    resources:
+      requests: {cpu: 25m, memory: 24Mi}
+      limits: {memory: 64Mi}
+  email:
+    resources:
+      requests: {cpu: 50m, memory: 64Mi}
+      limits: {memory: 160Mi}
+  fraud-detection:
+    resources:
+      requests: {cpu: 100m, memory: 192Mi}
+      limits: {memory: 384Mi}
+  frontend:
+    resources:
+      requests: {cpu: 100m, memory: 192Mi}
+      limits: {memory: 512Mi}
+  frontend-proxy:
+    resources:
+      requests: {cpu: 50m, memory: 64Mi}
+      limits: {memory: 128Mi}
+    ingress:
+      enabled: false
+  image-provider:
+    resources:
+      requests: {cpu: 25m, memory: 32Mi}
+      limits: {memory: 96Mi}
+  # Synthetic traffic is useful in demo environments, but should not create
+  # artificial customer traffic in production.
+  load-generator:
+    enabled: false
+  payment:
+    resources:
+      requests: {cpu: 50m, memory: 96Mi}
+      limits: {memory: 192Mi}
+  product-catalog:
+    resources:
+      requests: {cpu: 50m, memory: 48Mi}
+      limits: {memory: 128Mi}
+  quote:
+    resources:
+      requests: {cpu: 25m, memory: 32Mi}
+      limits: {memory: 96Mi}
+  recommendation:
+    resources:
+      requests: {cpu: 100m, memory: 256Mi}
+      limits: {memory: 640Mi}
+  shipping:
+    resources:
+      requests: {cpu: 50m, memory: 32Mi}
+      limits: {memory: 96Mi}
+  flagd:
+    replicas: 2
+  kafka:
+    replicas: 1
+
+opentelemetry-collector:
+  # The chart enables the cluster-metrics preset, which uses a singleton
+  # receiver and deliberately rejects multiple replicas.
+  replicaCount: 1
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {memory: 768Mi}
+
+prometheus:
+  server:
+    retention: 15d
+    persistentVolume:
+      enabled: true
+      size: 20Gi
+
+grafana:
+  persistence:
+    enabled: true
+    size: 10Gi

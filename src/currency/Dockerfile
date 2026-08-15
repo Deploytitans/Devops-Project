@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM alpine:3.18 AS builder
+FROM alpine:3.20 AS builder
 
-RUN apk update && apk add git cmake make g++ grpc-dev protobuf-dev linux-headers
+RUN apk add --no-cache git cmake make g++ grpc-dev protobuf-dev linux-headers
 
 ARG OPENTELEMETRY_CPP_VERSION
 
@@ -38,10 +38,12 @@ RUN cd /currency \
     && make -j$(nproc || sysctl -n hw.ncpu || echo 1) install
 
 
-FROM alpine:3.18 AS release
+FROM alpine:3.20 AS release
 
-RUN apk update && apk add grpc-dev protobuf-dev
+RUN apk add --no-cache grpc-dev protobuf-dev \
+    && addgroup -S app && adduser -S -G app -u 10001 app
 COPY --from=builder /usr/local /usr/local
 
+USER 10001:10001
 EXPOSE ${CURRENCY_PORT}
-ENTRYPOINT ["sh", "-c", "./usr/local/bin/currency ${CURRENCY_PORT}"]
+ENTRYPOINT ["sh", "-c", "exec /usr/local/bin/currency ${CURRENCY_PORT}"]

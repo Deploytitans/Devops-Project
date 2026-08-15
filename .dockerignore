@@ -1,8 +1,16 @@
 
 
 .github
+deploy
 docs
+infra
 internal
+scripts
+test
+**/node_modules
+**/bin
+**/obj
+**/target
 src/*/README.md
 src/*/Dockerfile
 src/*/*/Dockerfile

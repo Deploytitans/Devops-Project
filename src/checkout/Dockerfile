@@ -16,11 +16,13 @@ RUN --mount=type=cache,target=/go/pkg/mod/ \
     --mount=type=bind,rw,source=./src/checkout,target=. \
     go build -ldflags "-s -w" -o /go/bin/checkout/ ./
 
-FROM alpine
+FROM alpine:3.20
 
 WORKDIR /usr/src/app/
+RUN addgroup -S app && adduser -S -G app -u 10001 app
 
-COPY --from=builder /go/bin/checkout/ ./
+COPY --chown=app:app --from=builder /go/bin/checkout/ ./
 
+USER 10001:10001
 EXPOSE ${CHECKOUT_PORT}
 ENTRYPOINT [ "./checkout" ]

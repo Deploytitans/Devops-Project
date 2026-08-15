@@ -10,7 +10,7 @@ RUN apt-get -qq update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY ./src/load-generator/requirements.txt .
-RUN pip install --prefix="/reqs" -r requirements.txt
+RUN pip install --no-cache-dir --prefix="/reqs" -r requirements.txt
 
 FROM base
 WORKDIR /usr/src/app/
@@ -19,5 +19,9 @@ COPY ./src/load-generator/locustfile.py .
 COPY ./src/load-generator/people.json .
 ENV LOCUST_PLAYWRIGHT=1
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
-RUN playwright install --with-deps chromium
+RUN playwright install --with-deps chromium \
+    && groupadd --system --gid 10001 app \
+    && useradd --system --uid 10001 --gid app --create-home app \
+    && chown -R app:app /usr/src/app /opt/pw-browsers
+USER 10001:10001
 ENTRYPOINT ["locust", "--skip-log-setup"]
