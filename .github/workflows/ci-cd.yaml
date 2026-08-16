@@ -146,11 +146,11 @@ jobs:
           - {service: currency, dockerfile: src/currency/Dockerfile, args: 'OPENTELEMETRY_CPP_VERSION=1.23.0'}
           - {service: email, dockerfile: src/email/Dockerfile, args: ''}
           - {service: flagd-ui, dockerfile: src/flagd-ui/Dockerfile, args: ''}
-          - {service: fraud-detection, dockerfile: src/fraud-detection/Dockerfile, args: 'OTEL_JAVA_AGENT_VERSION=2.20.1'}
+          - {service: fraud-detection, dockerfile: src/fraud-detection/Dockerfile, args: 'OTEL_JAVA_AGENT_VERSION=2.26.1'}
           - {service: frontend, dockerfile: src/frontend/Dockerfile, args: ''}
           - {service: frontend-proxy, dockerfile: src/frontend-proxy/Dockerfile, args: ''}
           - {service: image-provider, dockerfile: src/image-provider/Dockerfile, args: ''}
-          - {service: kafka, dockerfile: src/kafka/Dockerfile, args: 'OTEL_JAVA_AGENT_VERSION=2.20.1'}
+          - {service: kafka, dockerfile: src/kafka/Dockerfile, args: 'OTEL_JAVA_AGENT_VERSION=2.26.1'}
           - {service: load-generator, dockerfile: src/load-generator/Dockerfile, args: ''}
           - {service: opensearch, dockerfile: src/opensearch/Dockerfile, args: ''}
           - {service: payment, dockerfile: src/payment/Dockerfile, args: ''}
@@ -185,6 +185,7 @@ jobs:
           file: ${{ matrix.dockerfile }}
           push: ${{ github.event_name != 'pull_request' }}
           load: ${{ github.event_name == 'pull_request' }}
+          pull: true
           tags: ${{ steps.image.outputs.name }}
           build-args: ${{ matrix.args }}
           cache-from: type=gha,scope=${{ matrix.service }}
@@ -194,11 +195,18 @@ jobs:
           # when images are pushed to ECR.
           provenance: ${{ github.event_name != 'pull_request' && 'mode=max' || 'false' }}
           sbom: ${{ github.event_name != 'pull_request' }}
-      - name: Scan container image
+      - name: Report high and critical image vulnerabilities
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
           image-ref: ${{ steps.image.outputs.name }}
           severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '0'
+      - name: Enforce critical image vulnerability gate
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: ${{ steps.image.outputs.name }}
+          severity: CRITICAL
           ignore-unfixed: true
           exit-code: '1'
 

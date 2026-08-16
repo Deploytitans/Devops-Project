@@ -9,7 +9,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     RECOMMENDATION_PORT=1010
 WORKDIR /usr/src/app
-RUN groupadd --system --gid 10001 app && useradd --system --uid 10001 --gid app app
+RUN apt-get update \
+    && apt-get upgrade --yes --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 10001 app \
+    && useradd --system --uid 10001 --gid app app
 COPY --from=builder /install /usr/local
 COPY --chown=app:app ./src/recommendation/ .
 RUN opentelemetry-bootstrap -a install && rm -rf /root/.cache

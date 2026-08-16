@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-FROM ruby:3.2.2-slim AS base
+FROM ruby:3.4-slim-bookworm@sha256:514336e7d46dd52b94a7391e4bc34dc04dc83098963c2c2493b90354952acd78 AS base
 
 FROM base AS builder
 
@@ -19,7 +19,11 @@ RUN apt-get update \
 FROM base AS release
 
 WORKDIR /email_server
-RUN groupadd --system --gid 10001 app && useradd --system --uid 10001 --gid app app
+RUN apt-get update \
+    && apt-get upgrade --yes --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 10001 app \
+    && useradd --system --uid 10001 --gid app app
 
 COPY --from=builder /usr/local/bundle/ /usr/local/bundle/
 COPY --chown=app:app ./src/email/ .

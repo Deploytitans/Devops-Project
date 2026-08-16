@@ -34,7 +34,7 @@ COPY ./pb/demo.proto /currency/proto/demo.proto
 
 RUN cd /currency \
     && mkdir -p build && cd build \
-    && cmake .. \
+    && cmake .. -DCMAKE_POLICY_DEFAULT_CMP0057=NEW \
     && make -j$(nproc || sysctl -n hw.ncpu || echo 1) install
 
 

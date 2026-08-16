@@ -30,8 +30,10 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nextjs -u 1001
+RUN apk upgrade --no-cache \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
+    && addgroup -g 1001 -S nodejs \
+    && adduser -S nextjs -u 1001
 
 COPY --from=builder /app/next.config.js ./
 COPY --from=builder /app/utils/telemetry/Instrumentation.js ./
@@ -47,5 +49,5 @@ USER nextjs
 ENV PORT=8080
 EXPOSE ${PORT}
 
-ENTRYPOINT ["npm", "start"]
+ENTRYPOINT ["node", "--require", "./Instrumentation.js", "server.js"]
 

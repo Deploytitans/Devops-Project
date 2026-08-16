@@ -58,7 +58,11 @@ RUN wget -qO/bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health
 FROM debian:bookworm-slim AS release
 
 WORKDIR /app
-RUN groupadd --system --gid 10001 app && useradd --system --uid 10001 --gid app app
+RUN apt-get update \
+    && apt-get upgrade --yes --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 10001 app \
+    && useradd --system --uid 10001 --gid app app
 COPY --chown=app:app --from=builder /app/target/release/shipping /app/shipping
 COPY --from=builder /bin/grpc_health_probe /bin/grpc_health_probe
 

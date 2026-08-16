@@ -14,6 +14,9 @@ RUN apk add --no-cache python3 make g++ && npm ci --omit=dev
 
 FROM node:22-alpine
 
+RUN apk upgrade --no-cache \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
 USER node
 WORKDIR /usr/src/app/
 ENV NODE_ENV=production
@@ -23,4 +26,4 @@ COPY ./src/payment/ ./
 COPY ./pb/demo.proto ./
 
 EXPOSE ${PAYMENT_PORT}
-ENTRYPOINT [ "npm", "run", "start" ]
+ENTRYPOINT [ "node", "--require", "./opentelemetry.js", "index.js" ]
