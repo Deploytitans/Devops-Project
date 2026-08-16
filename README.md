@@ -59,7 +59,8 @@ Pull requests execute:
 5. A report of high and critical image findings.
 6. A blocking gate for fixable critical image vulnerabilities.
 
-A push or merge to `main` additionally:
+When the required AWS deployment variables are configured, a push or merge to
+`main` additionally:
 
 1. Authenticates to AWS with GitHub OIDC and short-lived credentials.
 2. Publishes immutable images, SBOMs, and provenance to Amazon ECR.
@@ -70,6 +71,8 @@ A push or merge to `main` additionally:
 The deployment requires the AWS infrastructure, protected GitHub environment,
 repository variables, and VPC-connected runner described in the
 [production runbook](docs/production-deployment.md).
+Until those values exist, the workflow continues to test, build, and scan all
+images locally and clearly marks the EKS deployment as skipped.
 
 ## Run locally
 
