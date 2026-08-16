@@ -21,13 +21,18 @@ WORKDIR /app
 
 COPY ./src/flagd-ui/package*.json ./
 
-RUN npm ci --only=production
+RUN npm ci --omit=dev \
+    && npm cache clean --force \
+    && apk upgrade --no-cache \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 COPY --from=builder /app/src/instrumentation.ts ./instrumentation.ts
 COPY --from=builder /app/next.config.mjs ./next.config.mjs
 
 COPY --from=builder /app/.next ./.next
 
+RUN chown -R node:node /app
+USER node
 EXPOSE 4000
 
-CMD ["npm", "start"]
+CMD ["node", "node_modules/next/dist/bin/next", "start", "-p", "4000", "-H", "0.0.0.0"]

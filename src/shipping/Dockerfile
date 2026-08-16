@@ -51,15 +51,26 @@ RUN if [ "${TARGETPLATFORM}" = "${BUILDPLATFORM}" ] ; then \
     fi
 
 
-ENV GRPC_HEALTH_PROBE_VERSION=v0.4.24
-RUN wget -qO/bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-linux-${TARGETARCH} && \
-    chmod +x /bin/grpc_health_probe
+ENV GRPC_HEALTH_PROBE_VERSION=v0.4.55
+RUN cd /bin \
+    && wget -q https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-linux-${TARGETARCH} \
+    && wget -q https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/checksums.txt \
+    && grep "grpc_health_probe-linux-${TARGETARCH}$" checksums.txt | sha256sum -c - \
+    && mv grpc_health_probe-linux-${TARGETARCH} grpc_health_probe \
+    && chmod +x grpc_health_probe \
+    && rm checksums.txt
 
 FROM debian:bookworm-slim AS release
 
 WORKDIR /app
-COPY --from=builder /app/target/release/shipping /app/shipping
+RUN apt-get update \
+    && apt-get upgrade --yes --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 10001 app \
+    && useradd --system --uid 10001 --gid app app
+COPY --chown=app:app --from=builder /app/target/release/shipping /app/shipping
 COPY --from=builder /bin/grpc_health_probe /bin/grpc_health_probe
 
+USER 10001:10001
 EXPOSE ${SHIPPING_PORT}
 ENTRYPOINT ["/app/shipping"]

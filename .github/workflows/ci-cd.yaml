@@ -1,0 +1,235 @@
+name: production-ci-cd
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+  ECR_REPOSITORY_NAME: astronomy-shop
+  IMAGE_TAG: ${{ github.sha }}-${{ github.run_attempt }}
+
+jobs:
+  test:
+    name: Test ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: checkout
+            directory: src/checkout
+            command: go test ./...
+          - service: product-catalog
+            directory: src/product-catalog
+            command: go test ./...
+          - service: cart
+            directory: src/cart
+            command: dotnet test --configuration Release
+          - service: frontend
+            directory: src/frontend
+            command: ln -s ../../pb pb && npm ci && npm run grpc:generate && npm run build
+          - service: payment
+            directory: src/payment
+            command: npm ci && node --check index.js && node --check opentelemetry.js && npm audit --omit=dev
+          - service: recommendation
+            directory: src/recommendation
+            command: python -m compileall -q .
+          - service: email
+            directory: src/email
+            command: ruby -c email_server.rb
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        if: contains(fromJSON('["checkout", "product-catalog"]'), matrix.service)
+        with:
+          go-version: '1.25.x'
+          cache-dependency-path: ${{ matrix.directory }}/go.sum
+      - uses: actions/setup-dotnet@v4
+        if: matrix.service == 'cart'
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/setup-node@v4
+        if: contains(fromJSON('["frontend", "payment"]'), matrix.service)
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ${{ matrix.directory }}/package-lock.json
+      - name: Install Protocol Buffers compiler
+        if: matrix.service == 'frontend'
+        run: sudo apt-get update && sudo apt-get install --yes protobuf-compiler
+      - uses: actions/setup-python@v5
+        if: matrix.service == 'recommendation'
+        with:
+          python-version: '3.12'
+      - uses: ruby/setup-ruby@v1
+        if: matrix.service == 'email'
+        with:
+          ruby-version: '3.2'
+      - name: Run test
+        working-directory: ${{ matrix.directory }}
+        run: ${{ matrix.command }}
+
+  security:
+    name: Source and IaC security scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          skip-dirs: kubernetes,internal,test,src/react-native-app,src/checkout/genproto,src/currency/genproto,src/product-catalog/genproto,src/recommendation/genproto
+          skip-files: src/frontend/Dockerfile.cypress
+          trivyignores: .trivyignore.yaml
+          exit-code: '1'
+
+  validate-platform:
+    name: Validate Terraform and Helm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.12.2'
+      - name: Validate Terraform
+        working-directory: infra/terraform
+        run: |
+          terraform init -backend=false
+          terraform validate
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+      - name: Validate production chart values
+        shell: bash
+        run: |
+          helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+          helm repo update
+          sed -e 's|IMAGE_REPOSITORY|example.invalid/astronomy-shop|g' \
+              -e 's|IMAGE_TAG|validation|g' \
+              deploy/helm/values-production.yaml > /tmp/values-production.yaml
+          helm pull open-telemetry/opentelemetry-demo \
+            --version 0.40.9 --untar --untardir /tmp
+          helm lint /tmp/opentelemetry-demo \
+            --values /tmp/values-production.yaml
+          helm template astronomy-shop /tmp/opentelemetry-demo \
+            --namespace astronomy-shop \
+            --values /tmp/values-production.yaml >/dev/null
+
+  build:
+    name: Build ${{ matrix.service }}
+    needs: [test, security, validate-platform]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {service: accounting, dockerfile: src/accounting/Dockerfile, args: ''}
+          - {service: ad, dockerfile: src/ad/Dockerfile, args: ''}
+          - {service: cart, dockerfile: src/cart/src/Dockerfile, args: ''}
+          - {service: checkout, dockerfile: src/checkout/Dockerfile, args: ''}
+          - {service: currency, dockerfile: src/currency/Dockerfile, args: 'OPENTELEMETRY_CPP_VERSION=1.23.0'}
+          - {service: email, dockerfile: src/email/Dockerfile, args: ''}
+          - {service: flagd-ui, dockerfile: src/flagd-ui/Dockerfile, args: ''}
+          - {service: fraud-detection, dockerfile: src/fraud-detection/Dockerfile, args: 'OTEL_JAVA_AGENT_VERSION=2.26.1'}
+          - {service: frontend, dockerfile: src/frontend/Dockerfile, args: ''}
+          - {service: frontend-proxy, dockerfile: src/frontend-proxy/Dockerfile, args: ''}
+          - {service: image-provider, dockerfile: src/image-provider/Dockerfile, args: ''}
+          - {service: kafka, dockerfile: src/kafka/Dockerfile, args: 'OTEL_JAVA_AGENT_VERSION=2.26.1'}
+          - {service: load-generator, dockerfile: src/load-generator/Dockerfile, args: ''}
+          - {service: opensearch, dockerfile: src/opensearch/Dockerfile, args: ''}
+          - {service: payment, dockerfile: src/payment/Dockerfile, args: ''}
+          - {service: postgresql, dockerfile: src/postgres/Dockerfile, args: ''}
+          - {service: product-catalog, dockerfile: src/product-catalog/Dockerfile, args: ''}
+          - {service: quote, dockerfile: src/quote/Dockerfile, args: ''}
+          - {service: recommendation, dockerfile: src/recommendation/Dockerfile, args: ''}
+          - {service: shipping, dockerfile: src/shipping/Dockerfile, args: ''}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: github.event_name != 'pull_request'
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        if: github.event_name != 'pull_request'
+      - name: Compute image name
+        id: image
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "name=local/${{ matrix.service }}:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${{ steps.ecr.outputs.registry }}/${ECR_REPOSITORY_NAME}:${IMAGE_TAG}-${{ matrix.service }}" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: ${{ github.event_name != 'pull_request' }}
+          load: ${{ github.event_name == 'pull_request' }}
+          pull: true
+          tags: ${{ steps.image.outputs.name }}
+          build-args: ${{ matrix.args }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          # The local Docker exporter used for PR scans cannot export the
+          # manifest list created by attestations. Publish attestations only
+          # when images are pushed to ECR.
+          provenance: ${{ github.event_name != 'pull_request' && 'mode=max' || 'false' }}
+          sbom: ${{ github.event_name != 'pull_request' }}
+      - name: Report high and critical image vulnerabilities
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: ${{ steps.image.outputs.name }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '0'
+      - name: Enforce critical image vulnerability gate
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: ${{ steps.image.outputs.name }}
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+  deploy:
+    name: Deploy and verify EKS
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: [self-hosted, linux, production-vpc]
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+      - name: Deploy immutable release
+        env:
+          ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY_URL }}
+          WAF_ACL_ARN: ${{ vars.WAF_ACL_ARN }}
+          ACM_CERTIFICATE_ARN: ${{ vars.ACM_CERTIFICATE_ARN }}
+          ALB_CONTROLLER_ROLE_ARN: ${{ vars.ALB_CONTROLLER_ROLE_ARN }}
+          CLUSTER_AUTOSCALER_ROLE_ARN: ${{ vars.CLUSTER_AUTOSCALER_ROLE_ARN }}
+        run: bash scripts/deploy-eks.sh

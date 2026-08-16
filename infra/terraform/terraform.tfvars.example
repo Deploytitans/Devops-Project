@@ -1,0 +1,5 @@
+aws_region          = "ap-south-1"
+environment         = "production"
+cluster_name        = "astronomy-shop-production"
+github_repository   = "your-org/your-repository"
+alert_email         = "security@example.com"

@@ -30,12 +30,14 @@ RUN dotnet publish ./src/cart.csproj -r linux-musl-$TARGETARCH --no-restore -o /
 # -----------------------------------------------------------------------------
 
 # https://mcr.microsoft.com/v2/dotnet/runtime-deps/tags/list
-FROM mcr.microsoft.com/dotnet/runtime-deps:8.0-alpine3.20
+FROM mcr.microsoft.com/dotnet/runtime-deps:8.0.30-alpine3.24
 
 WORKDIR /usr/src/app/
+RUN apk upgrade --no-cache
 COPY --from=builder /cart/ ./
 
 ENV DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE=false
 
+USER app
 EXPOSE ${CART_PORT}
 ENTRYPOINT [ "./cart" ]
