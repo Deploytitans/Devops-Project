@@ -16,12 +16,58 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_REGION: ${{ vars.AWS_REGION || 'ap-south-1' }}
   EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
   ECR_REPOSITORY_NAME: astronomy-shop
   IMAGE_TAG: ${{ github.sha }}-${{ github.run_attempt }}
 
 jobs:
+  deployment_config:
+    name: Check deployment configuration
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - name: Check required AWS variables
+        id: check
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+          ECR_REPOSITORY_URL: ${{ vars.ECR_REPOSITORY_URL }}
+          WAF_ACL_ARN: ${{ vars.WAF_ACL_ARN }}
+          ACM_CERTIFICATE_ARN: ${{ vars.ACM_CERTIFICATE_ARN }}
+          ALB_CONTROLLER_ROLE_ARN: ${{ vars.ALB_CONTROLLER_ROLE_ARN }}
+          CLUSTER_AUTOSCALER_ROLE_ARN: ${{ vars.CLUSTER_AUTOSCALER_ROLE_ARN }}
+        run: |
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          required=(
+            AWS_DEPLOY_ROLE_ARN
+            EKS_CLUSTER_NAME
+            ECR_REPOSITORY_URL
+            WAF_ACL_ARN
+            ACM_CERTIFICATE_ARN
+            ALB_CONTROLLER_ROLE_ARN
+            CLUSTER_AUTOSCALER_ROLE_ARN
+          )
+          missing=()
+          for name in "${required[@]}"; do
+            [[ -n "${!name}" ]] || missing+=("${name}")
+          done
+
+          if (( ${#missing[@]} > 0 )); then
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            echo "::warning::AWS deployment is disabled. Configure the production environment variables: ${missing[*]}"
+            exit 0
+          fi
+
+          echo "enabled=true" >> "${GITHUB_OUTPUT}"
+
   test:
     name: Test ${{ matrix.service }}
     runs-on: ubuntu-latest
@@ -133,7 +179,7 @@ jobs:
 
   build:
     name: Build ${{ matrix.service }}
-    needs: [test, security, validate-platform]
+    needs: [test, security, validate-platform, deployment_config]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -163,28 +209,28 @@ jobs:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
       - uses: aws-actions/configure-aws-credentials@v4
-        if: github.event_name != 'pull_request'
+        if: needs.deployment_config.outputs.enabled == 'true'
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
       - id: ecr
         uses: aws-actions/amazon-ecr-login@v2
-        if: github.event_name != 'pull_request'
+        if: needs.deployment_config.outputs.enabled == 'true'
       - name: Compute image name
         id: image
         shell: bash
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "name=local/${{ matrix.service }}:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
-          else
+          if [[ "${{ needs.deployment_config.outputs.enabled }}" == "true" ]]; then
             echo "name=${{ steps.ecr.outputs.registry }}/${ECR_REPOSITORY_NAME}:${IMAGE_TAG}-${{ matrix.service }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=local/${{ matrix.service }}:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
           fi
       - uses: docker/build-push-action@v6
         with:
           context: .
           file: ${{ matrix.dockerfile }}
-          push: ${{ github.event_name != 'pull_request' }}
-          load: ${{ github.event_name == 'pull_request' }}
+          push: ${{ needs.deployment_config.outputs.enabled == 'true' }}
+          load: ${{ needs.deployment_config.outputs.enabled != 'true' }}
           pull: true
           tags: ${{ steps.image.outputs.name }}
           build-args: ${{ matrix.args }}
@@ -193,8 +239,8 @@ jobs:
           # The local Docker exporter used for PR scans cannot export the
           # manifest list created by attestations. Publish attestations only
           # when images are pushed to ECR.
-          provenance: ${{ github.event_name != 'pull_request' && 'mode=max' || 'false' }}
-          sbom: ${{ github.event_name != 'pull_request' }}
+          provenance: ${{ needs.deployment_config.outputs.enabled == 'true' && 'mode=max' || 'false' }}
+          sbom: ${{ needs.deployment_config.outputs.enabled == 'true' }}
       - name: Report high and critical image vulnerabilities
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
@@ -212,8 +258,8 @@ jobs:
 
   deploy:
     name: Deploy and verify EKS
-    if: github.event_name != 'pull_request'
-    needs: build
+    if: needs.deployment_config.outputs.enabled == 'true'
+    needs: [build, deployment_config]
     runs-on: [self-hosted, linux, production-vpc]
     environment: production
     steps:

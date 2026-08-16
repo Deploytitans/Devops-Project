@@ -116,7 +116,9 @@ flowchart LR
 ```
 
 Pull requests stop after successful build and scan validation. Merges and
-pushes to `main`, plus approved manual dispatches, can publish and deploy. The
+pushes to `main`, plus approved manual dispatches, publish and deploy when all
+required AWS variables are configured. Without them, the workflow continues in
+local build-and-scan mode and skips deployment with one clear warning. The
 `production` GitHub environment should require reviewers before deployment.
 
 ## Repository layout
