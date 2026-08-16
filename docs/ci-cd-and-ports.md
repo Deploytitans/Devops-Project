@@ -1,12 +1,12 @@
-# CI/CD Tool and Port 8080 Explained
+# CI/CD Tool and Local Ports Explained
 
 ## Short answer
 
 This project uses **GitHub Actions for CI/CD**. It does **not** use Jenkins.
 
-Port `8080` is the local entry point for the Astronomy Shop application. The
-fact that Jenkins often uses port `8080` does not mean that every application
-on port `8080` is Jenkins.
+Port `8081` is the local entry point for the Astronomy Shop application. The
+container continues to listen internally on port `8080`, but Docker publishes
+it as `8081` on the host to avoid Jenkins' common default port.
 
 ## GitHub Actions or Jenkins?
 
@@ -39,19 +39,19 @@ ECR publication and EKS deployment run only after the required AWS
 infrastructure and GitHub variables are configured. Until then, GitHub Actions
 still tests, builds, and scans the complete repository locally in its runners.
 
-## What is using port 8080?
+## What is using port 8081?
 
 When the project runs with Docker Compose, `frontend-proxy` exposes the
-application on the host's port `8080`. It acts as the gateway for the shop and
+application on the host's port `8081`. It acts as the gateway for the shop and
 the observability user interfaces.
 
 | Address | Purpose |
 |---|---|
-| `http://localhost:8080` | Astronomy Shop user interface |
-| `http://localhost:8080/jaeger/ui` | Jaeger distributed tracing interface |
-| `http://localhost:8080/grafana/` | Grafana dashboards |
-| `http://localhost:8080/loadgen/` | Load Generator interface |
-| `http://localhost:8080/feature/` | Feature flag interface |
+| `http://localhost:8081` | Astronomy Shop user interface |
+| `http://localhost:8081/jaeger/ui` | Jaeger distributed tracing interface |
+| `http://localhost:8081/grafana/` | Grafana dashboards |
+| `http://localhost:8081/loadgen/` | Load Generator interface |
+| `http://localhost:8081/feature/` | Feature flag interface |
 
 Port numbers are reusable identifiers. Different applications may use the same
 default port as long as they are not trying to bind that port on the same host
@@ -60,10 +60,11 @@ at the same time.
 For example:
 
 - Jenkins commonly defaults to port `8080`.
-- This project also defaults to port `8080` for its local frontend proxy.
+- This project uses host port `8081` for its local frontend proxy.
 - They are unrelated applications.
-- They conflict only if both run on the same machine and both try to use host
-  port `8080` simultaneously.
+- The frontend-proxy container still uses internal port `8080`; Docker maps
+  host port `8081` to it, so it does not conflict with Jenkins on host port
+  `8080`.
 
 ## How to prove that Jenkins is not used
 
@@ -89,7 +90,7 @@ configuration, or Jenkins container in the production implementation.
 
 ```mermaid
 flowchart LR
-  Browser["Browser"] --> Port["localhost:8080"]
+  Browser["Browser"] --> Port["localhost:8081"]
   Port --> Proxy["Frontend Proxy container"]
   Proxy --> Shop["Frontend service"]
   Proxy --> Jaeger["Jaeger UI"]
@@ -103,7 +104,7 @@ and communicates with GitHub, container registries, and AWS through their APIs.
 
 ## Production request flow
 
-In AWS, users do not access `localhost:8080`. The request path is:
+In AWS, users do not access `localhost:8081`. The request path is:
 
 ```mermaid
 flowchart LR
@@ -119,13 +120,18 @@ service. Container ports remain internal implementation details.
 
 ## What if Jenkins is already running locally?
 
-If Jenkins already occupies host port `8080`, Docker cannot publish the shop on
-that same port. Typical options are:
+Jenkins can continue using host port `8080` while the shop uses `8081`.
+The effective Docker mapping is:
 
-1. Stop Jenkins while running the shop.
-2. Reconfigure Jenkins to another port.
-3. Change the shop's host-side port mapping, for example from `8080:8080` to
-   `8081:8080`, then open `http://localhost:8081`.
+```text
+localhost:8081 -> frontend-proxy container:8080
+```
+
+If port `8081` is also occupied, typical options are:
+
+1. Stop the process using `8081`.
+2. Set `FRONTEND_PROXY_PORT` in `.env` to another unused host port.
+3. Open the shop using that new host port.
 
 Changing the host-side port does not change the CI/CD tool. The project still
 uses GitHub Actions.
@@ -135,10 +141,10 @@ uses GitHub Actions.
 > Our CI/CD tool is GitHub Actions, not Jenkins. The workflow is stored in
 > `.github/workflows/ci-cd.yaml` and automates testing, security scanning,
 > building 20 images, publishing to ECR, deploying to EKS, and verification.
-> Port 8080 appears in the README because it is the local frontend-proxy port
-> for the Astronomy Shop. Jenkins also commonly defaults to 8080, but a port
-> number does not identify the software using it. No Jenkins server or
-> Jenkinsfile is part of this implementation.
+> The shop uses `localhost:8081`; Docker maps that host port to port `8080`
+> inside the frontend-proxy container. Jenkins can therefore keep its common
+> host port `8080`. CI/CD is still implemented by GitHub Actions, and no
+> Jenkins server or Jenkinsfile is part of this project.
 
 ## Related documentation
 

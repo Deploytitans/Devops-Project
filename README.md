@@ -90,11 +90,11 @@ make start
 
 Open:
 
-- Shop: <http://localhost:8080>
-- Jaeger: <http://localhost:8080/jaeger/ui>
-- Grafana: <http://localhost:8080/grafana/>
-- Load generator: <http://localhost:8080/loadgen/>
-- Feature flags: <http://localhost:8080/feature/>
+- Shop: <http://localhost:8081>
+- Jaeger: <http://localhost:8081/jaeger/ui>
+- Grafana: <http://localhost:8081/grafana/>
+- Load generator: <http://localhost:8081/loadgen/>
+- Feature flags: <http://localhost:8081/feature/>
 
 Stop the application and remove its local volumes:
 

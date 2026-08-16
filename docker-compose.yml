@@ -340,7 +340,7 @@ services:
           memory: 65M
     restart: unless-stopped
     ports:
-      - "${ENVOY_PORT}:${ENVOY_PORT}"
+      - "${FRONTEND_PROXY_PORT}:${ENVOY_PORT}"
       - "${ENVOY_ADMIN_PORT}:${ENVOY_ADMIN_PORT}"
     environment:
       - FRONTEND_PORT
