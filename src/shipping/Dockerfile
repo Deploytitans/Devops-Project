@@ -51,9 +51,14 @@ RUN if [ "${TARGETPLATFORM}" = "${BUILDPLATFORM}" ] ; then \
     fi
 
 
-ENV GRPC_HEALTH_PROBE_VERSION=v0.4.24
-RUN wget -qO/bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-linux-${TARGETARCH} && \
-    chmod +x /bin/grpc_health_probe
+ENV GRPC_HEALTH_PROBE_VERSION=v0.4.55
+RUN cd /bin \
+    && wget -q https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-linux-${TARGETARCH} \
+    && wget -q https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/checksums.txt \
+    && grep "grpc_health_probe-linux-${TARGETARCH}$" checksums.txt | sha256sum -c - \
+    && mv grpc_health_probe-linux-${TARGETARCH} grpc_health_probe \
+    && chmod +x grpc_health_probe \
+    && rm checksums.txt
 
 FROM debian:bookworm-slim AS release
 
