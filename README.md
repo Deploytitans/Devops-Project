@@ -1,6 +1,6 @@
 # Astronomy Shop Production DevOps Project
 
-[![production-ci-cd](https://github.com/Deploytitans/Devops-Project/actions/workflows/ci-cd.yaml/badge.svg)](https://github.com/Deploytitans/Devops-Project/actions/workflows/ci-cd.yaml)
+[![production-ci-cd](https://github.com/Deploytitans/Devops-Project/actions/workflows/ci-cd.yaml/badge.svg?branch=main&event=push)](https://github.com/Deploytitans/Devops-Project/actions/workflows/ci-cd.yaml?query=branch%3Amain+event%3Apush)
 
 This repository productionizes the OpenTelemetry Astronomy Shop demo across
 the application, container, infrastructure, security, observability, and
@@ -152,6 +152,7 @@ storage, logging, and security resources.
 ## Documentation
 
 - [Project overview and handoff guide](docs/project-overview.md)
+- [GitHub Actions, Jenkins, and port 8080 explained](docs/ci-cd-and-ports.md)
 - [Production deployment runbook](docs/production-deployment.md)
 - [Contributing guide](CONTRIBUTING.md)
 
