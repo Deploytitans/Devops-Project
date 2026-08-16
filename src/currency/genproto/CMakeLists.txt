@@ -55,5 +55,9 @@ add_library(demo-proto ${DEMO_PB_H_FILE}
            ${HEALTH_GRPC_PB_CPP_FILE}
            ${HEALTH_GRPC_PB_H_FILE})
 
-target_link_libraries(demo-proto gRPC::grpc++ protobuf::libprotobuf)
+target_link_libraries(
+    demo-proto
+    gRPC::grpc++
+    protobuf::libprotobuf
+    absl::log_internal_check_op)
 include_directories("${GENERATED_PROTOBUF_PATH}" )
